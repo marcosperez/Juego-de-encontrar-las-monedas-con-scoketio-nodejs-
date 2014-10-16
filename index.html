@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Atrapar las monedas</title>
+
+<script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+<script src="http://code.createjs.com/easeljs-0.7.1.min.js"></script>
+<script type="text/javascript" src="http://code.createjs.com/preloadjs-0.4.1.min.js"></script>
+<!-- Latest compiled and minified CSS -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+
+<!-- Optional theme -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap-theme.min.css">
+
+<!-- Latest compiled and minified JavaScript -->
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+<script src="https://cdn.socket.io/socket.io-1.1.0.js"></script>
+
+
+
+
+<style type="text/css">
+	 #stageCanvas
+        {
+            height: 600;
+            width: 800;
+        }
+</style>
+<body>
+<center>
+	<div><h2>Bienvenido al juego de encontrar la moneda!!</h2>
+		<p>Objetivo del juego:</p>
+		<p>Se debe buscar con la lupa hasta encontar todas las monedas que indica el marcado de monedas el primer player en alcanzar los 10000 puntos o 100 monedas sera el ganador!!!</p>
+		<p>Se puede jugar de a 20 mil si quieren xD</p>
+	</div>
+	<canvas id="stageCanvas" height="600" width="800">
+</center>
+
+	
+
+</canvas>
+
+
+<script type="text/javascript">
+
+	var stage;
+	var lupa
+	var mascara ;
+	var moneda;
+	var players=[];
+	var socket = io('http://hackersuololo.ddns.net:3000/');
+	var CantidadMonedas;
+
+	$(document).ready(function(){
+		stage = new createjs.Stage("stageCanvas");
+		createjs.Touch.enable(stage);
+		//Agregamos el fondo Oscuro
+	 	var fondoFuerte = new createjs.Shape();
+ 		fondoFuerte.graphics.beginFill("blue").drawRect(0, 0, stage.canvas.width, stage.canvas.height);
+ 		stage.addChild(fondoFuerte);
+
+ 		//fondo suave donde van a estar las cosas
+ 		var fondoSuave = new createjs.Shape();
+ 		fondoSuave.graphics.beginFill("skyblue").drawRect(0, 0, stage.canvas.width, stage.canvas.height);
+
+
+
+ 		//ciruclo que servira de mascara para todas las cosas.
+ 		mascara = new createjs.Shape();
+ 		mascara.graphics.beginStroke("yellow").drawCircle(35, 25, 150).endStroke();
+ 		fondoSuave.mask=mascara;
+ 		mascara.regX=-15;
+ 		mascara.regY=-15;
+
+
+ 		stage.addChild(mascara);
+ 		stage.addChild(fondoSuave);
+
+ 		//cargamos la monedas
+ 		moneda = new createjs.Bitmap("img/dogCoin.png");
+ 		moneda.scaleX=0.1;
+ 		moneda.scaleY=0.1;
+ 		
+
+ 		 //monedas
+ 		var monedas = new createjs.Text("Cantidad de monedas", "15px Arial", "#FFF");
+	    monedas.x =stage.canvas.width-170;
+	    monedas.y=2;
+	    CantidadMonedas = new createjs.Text("0", "15px Arial", "#FFF");
+	    CantidadMonedas.x = stage.canvas.width-100;
+	    CantidadMonedas.y=18;
+
+	    stage.addChild(monedas);
+	    stage.addChild(CantidadMonedas);
+
+ 		createjs.Ticker.setFPS(60);
+		createjs.Ticker.addEventListener("tick", reloj);
+ 		stage.update();
+	});
+
+
+	//evento de tick de reloj
+
+	function reloj(evt){
+
+		mascara.x=stage.mouseX;
+		mascara.y= stage.mouseY;
+
+		if((1 - 0.04*CantidadMonedas.text)>0.10){
+			mascara.scaleX = 1 - 0.04*CantidadMonedas.text;
+	 		mascara.scaleY = 1 - 0.04*CantidadMonedas.text;
+	 	}	else {
+	 		mascara.scaleX = 0.09;
+	 		mascara.scaleY =0.09;
+	 	}
+
+	 	if(CantidadMonedas.text>3)
+	 		mascara.rotation+=CantidadMonedas.text/2;
+
+		stage.update(evt);
+	}
+
+	function crearMoneda(x,y,clave){
+		//Funcion que me permite agregar una nueva moneda
+		nuevaMoneda = moneda.clone();
+ 		nuevaMoneda.addEventListener('click',clickMoneda);
+ 		nuevaMoneda.mask = mascara;
+ 		nuevaMoneda.x = x;
+ 		nuevaMoneda.y = y;
+ 		nuevaMoneda.name=clave;
+ 		stage.addChild(nuevaMoneda);
+
+ 		console.log("moneda creada en x: "+x+" y: "+y);
+
+
+	}
+	function clickMoneda(evt){
+		
+		console.log("click sobre la moneda "+evt.currentTarget.name);
+		socket.emit("click moneda",evt.currentTarget.name);
+		stage.removeChild(evt.currentTarget);
+
+	}
+
+	//Metodos de nodejs y socket.io
+
+	socket.on("nueva moneda",function(datos){
+		crearMoneda(datos.x,datos.y,datos.clave);
+	});
+
+	socket.on("quitar moneda",function(clave){
+		stage.removeChild(stage.getChildByName(clave));
+	});
+
+	socket.on("jugador conectado",function(player){
+		var nombre = new createjs.Text(player.nick, "15px Arial", "#FFF");
+	    nombre.y = 2+16*3*(players.length);
+	    var puntos = new createjs.Text("Puntos: "+player.puntos, "15px Arial", "#FFF");
+	    puntos.y = 18+16*3*(players.length);
+	    var monedas = new createjs.Text("Monedas: "+player.monedas, "15px Arial", "#FFF");
+	    monedas.y = 34+16*3*(players.length);
+	    stage.addChild(nombre);
+	    stage.addChild(puntos);
+	    stage.addChild(monedas);
+
+	    player.nombreText= nombre;
+	    player.puntosText=puntos;
+	    player.monedasText=monedas;
+
+	    players.push(player);		
+	});
+
+		socket.on("jugadores",function(p){
+			cargarJugadores(p);
+				
+		});
+
+	socket.on("actualizar players",function(jugadores){
+		console.log("mis jugadores "+JSON.stringify(jugadores));
+		for (var indice = jugadores.length - 1; indice >= 0; indice--) {
+			//console.log("mis players "+JSON.stringify(players));
+			var i = recuperarPlayer(jugadores[indice].nick);
+			
+			players[i].puntos= jugadores[indice].puntos;
+			players[i]["puntosText"].text= "Puntos: "+jugadores[indice].puntos;
+			players[i]["monedas"]= jugadores[indice].puntos;
+			players[i]["monedasText"].text= "Monedas: "+jugadores[indice].monedas;
+			stage.update();
+				
+			
+		}
+		
+	});
+
+	socket.on("desconectado",function(nombre){
+		for (var i = players.length - 1; i >= 0; i--) {
+			if(players[i].nick==nombre){
+				limpiar(i)
+				}
+		};
+	});
+
+	function recuperarPlayer(nombre){
+	    console.log(nombre);
+		for (var i = players.length - 1; i >= 0; i--) {
+			if(players[i].nick==nombre)
+				return i;
+		};
+	}
+
+
+	function limpiar(){
+		for (var i = players.length - 1; i >= 0; i--) {
+			stage.removeChild(players[i]["nombreText"]);
+			stage.removeChild(players[i]["monedasText"]);
+			stage.removeChild(players[i]["puntosText"]);
+		};
+		players.splice(i,1);
+		p = players;
+		players=[];
+		cargarJugadores(p);
+
+	}
+	function cargarJugadores(p){
+			for (var i = p.length - 1; i >= 0; i--) {
+				if(p.length == (i+1)){
+			    	//Agregamos el fondo Oscuro
+				 	var fondoFuerte = new createjs.Shape();
+			 		fondoFuerte.graphics.beginFill("black").drawRect(0, 2+16*3*i,120, 50);
+			 		stage.addChild(fondoFuerte);
+			    }
+				var nombre = new createjs.Text(p[i].nick, "15px Arial", "#FFF");
+			    nombre.y = 2+16*3*i;
+			    var puntos = new createjs.Text("Puntos: "+p[i].puntos, "15px Arial", "#FFF");
+			    puntos.y = 18+16*3*i;
+			    var monedas = new createjs.Text("Monedas: "+p[i].monedas, "15px Arial", "#FFF");
+			    monedas.y = 34+16*3*i;
+			    stage.addChild(nombre);
+			    stage.addChild(puntos);
+			    stage.addChild(monedas);
+
+			    p[i].nombreText= nombre;
+			    p[i].puntosText=puntos;
+			    p[i].monedasText=monedas;
+
+			    players.push(p[i]);	
+
+
+			};
+	}
+
+	socket.on("Gano",function(nombre){
+		alert("El "+nombre+" ha ganado!!!!!");
+		//location.reload();
+	});
+
+	socket.on("cantidad monedas",function(cant){
+		console.log("cantidad de monedas "+cant);
+		CantidadMonedas.text=cant;
+		if(cant<=4){
+			 mascara.graphics= new createjs.Graphics().beginStroke("yellow").drawCircle(35, 25, 150).endStroke();
+			 mascara.regX=-15;
+	 		 mascara.regY=-15;
+ 		}
+		 else if(cant>4){
+ 			mascara.graphics = new createjs.Graphics().beginFill("rgba(255,255,255,1)").drawPolyStar(150, 150, 150, 13-cant, 0, 45);
+ 			mascara.regX=100;
+ 			mascara.regY=100;
+ 		}
+		else if(cant>10){
+			mascara.graphics = new createjs.Graphics().beginFill("rgba(255,255,255,1)").drawPolyStar(150, 150, 120, 5, 0.6, -90);
+			mascara.regX=120;
+ 			mascara.regY=120;
+		}
+
+
+	});
+</script>
+
+
+
+</body>
+</html>

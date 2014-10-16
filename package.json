@@ -1,0 +1,12 @@
+{
+  "name": "Monedas",
+  "version": "0.15.10.14",
+  "private": true,
+  "scripts": {
+    "start": "node ./bin/www"
+  },
+  "dependencies": {
+    "express": "~4.8.6",
+    "socket.io": "*"
+  }
+}
